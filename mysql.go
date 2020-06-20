@@ -4,13 +4,12 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
 
-	"github.com/mholt/archiver/v3"
 	"github.com/opencontainers/runc/libcontainer"
 	"github.com/urfave/cli"
 )
@@ -32,6 +31,7 @@ func New(bundleFileUri ...string) *RuncMysql {
 		initDatabase:  "test",
 		bundleZipFile: "mysql.tar.gz",
 		name:          "mysql",
+		dir:           filepath.Join(os.TempDir(), "mysql"),
 	}
 	if len(bundleFileUri) > 0 {
 		c.bundleFileUri = bundleFileUri[0]
@@ -42,13 +42,16 @@ func New(bundleFileUri ...string) *RuncMysql {
 	return c
 }
 
+func (c *RuncMysql) SetDir(dir string) {
+	c.dir = dir
+}
+
 func (c *RuncMysql) Load() error {
-	dir, err := ioutil.TempDir(os.TempDir(), "mysql*")
+	err := os.MkdirAll(c.dir, os.ModePerm)
 	if err != nil {
 		return err
 	}
-	c.dir = dir
-	bundleFilePath := filepath.Join(dir, c.bundleZipFile)
+	bundleFilePath := filepath.Join(c.dir, c.bundleZipFile)
 	err = downLoadFile(c.bundleFileUri, bundleFilePath)
 	if err != nil {
 		return err
@@ -73,7 +76,7 @@ func MockFlagSet(args []string) *flag.FlagSet {
 
 func (c *RuncMysql) Start() error {
 	os.Chdir(filepath.Join(c.dir, "bundle"))
-	context := cli.NewContext(cli.NewApp(), MockFlagSet([]string{"--detach", c.name}), nil)
+	context := cli.NewContext(cli.NewApp(), MockFlagSet([]string{c.name}), nil)
 	if err := checkArgs(context, 1, exactArgs); err != nil {
 		return err
 	}
@@ -144,6 +147,6 @@ func downLoadFile(src, dest string) error {
 }
 
 func extractTarGz(bundleFilePath string) error {
-	err := archiver.Unarchive(bundleFilePath, ".")
-	return err
+	cmd := exec.Command("/bin/tar", "zxvf", bundleFilePath)
+	return cmd.Run()
 }
