@@ -1,0 +1,4 @@
+rootfs
+*.tar.gz
+.idea
+.DS_Store
