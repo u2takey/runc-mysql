@@ -15,22 +15,28 @@ import (
 	"github.com/urfave/cli"
 )
 
-const BundleFileUri = "https://public-1251825869.cos.ap-shanghai.myqcloud.com/alpine.tar.gz"
+const DefaultBundleFileUri = "https://public-1251825869.cos.ap-shanghai.myqcloud.com/mysql.tar.gz"
 
 type RuncMysql struct {
-	ep            string
+	initDatabase  string
 	rootPassword  string
 	dir           string
 	bundleZipFile string
 	name          string
+	bundleFileUri string
 }
 
-func New(ep, rootPassword string) *RuncMysql {
+func New(bundleFileUri ...string) *RuncMysql {
 	c := &RuncMysql{
-		ep:            ep,
-		rootPassword:  rootPassword,
+		rootPassword:  "root",
+		initDatabase:  "test",
 		bundleZipFile: "mysql.tar.gz",
 		name:          "mysql",
+	}
+	if len(bundleFileUri) > 0 {
+		c.bundleFileUri = bundleFileUri[0]
+	} else {
+		c.bundleFileUri = DefaultBundleFileUri
 	}
 
 	return c
@@ -43,7 +49,7 @@ func (c *RuncMysql) Load() error {
 	}
 	c.dir = dir
 	bundleFilePath := filepath.Join(dir, c.bundleZipFile)
-	err = downLoadFile(BundleFileUri, bundleFilePath)
+	err = downLoadFile(c.bundleFileUri, bundleFilePath)
 	if err != nil {
 		return err
 	}
@@ -66,8 +72,8 @@ func MockFlagSet(args []string) *flag.FlagSet {
 }
 
 func (c *RuncMysql) Start() error {
-	os.Chdir(c.dir)
-	context := cli.NewContext(cli.NewApp(), MockFlagSet([]string{"t", c.name}), nil)
+	os.Chdir(filepath.Join(c.dir, "bundle"))
+	context := cli.NewContext(cli.NewApp(), MockFlagSet([]string{"--detach", c.name}), nil)
 	if err := checkArgs(context, 1, exactArgs); err != nil {
 		return err
 	}
@@ -83,7 +89,7 @@ func (c *RuncMysql) Start() error {
 }
 
 func (c *RuncMysql) ShutDown(force bool) error {
-	context := cli.NewContext(cli.NewApp(), MockFlagSet([]string{"t", c.name}), nil)
+	context := cli.NewContext(cli.NewApp(), MockFlagSet([]string{c.name}), nil)
 	if err := checkArgs(context, 1, exactArgs); err != nil {
 		return err
 	}

@@ -1,4 +1,5 @@
 rootfs
+bundle
 *.tar.gz
 .idea
 .DS_Store
